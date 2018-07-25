@@ -263,10 +263,27 @@ class BarclaycardSmartpayTest < Test::Unit::TestCase
     response = stub_comms do
       @gateway.credit(@amount, @credit_card, @options_with_credit_fields)
     end.check_request do |endpoint, data, headers|
+      assert_match(%r{/refundWithData}, endpoint)
       assert_match(/dateOfBirth=1990-10-11&/, data)
       assert_match(/entityType=NaturalPerson&/, data)
       assert_match(/nationality=US&/, data)
       assert_match(/shopperName.firstName=Longbob&/, data)
+    end.respond_with(successful_credit_response)
+
+    assert_success response
+    assert response.test?
+  end
+
+  def test_successful_third_party_payout
+    response = stub_comms do
+      @gateway.credit(@amount, @credit_card, @options_with_credit_fields.merge({third_party_payout: true}))
+    end.check_request do |endpoint, data, headers|
+      assert_match(%r{/storeDetailAndSubmitThirdParty}, endpoint)
+      assert_match(/dateOfBirth=1990-10-11&/, data)
+      assert_match(/entityType=NaturalPerson&/, data)
+      assert_match(/nationality=US&/, data)
+      assert_match(/shopperName.firstName=Longbob&/, data)
+      assert_match(/recurring\.contract=PAYOUT/, data)
     end.respond_with(successful_credit_response)
 
     assert_success response

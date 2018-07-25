@@ -68,7 +68,12 @@ module ActiveMerchant #:nodoc:
         post[:nationality] = options[:nationality] if options[:nationality]
         post[:shopperName] = options[:shopper_name] if options[:shopper_name]
 
-        commit('refundWithData', post)
+        if options[:third_party_payout]
+          post[:recurring] = options[:recurring_contract] || {contract: 'PAYOUT'}
+          commit('storeDetailAndSubmitThirdParty', post)
+        else
+          commit('refundWithData', post)
+        end
       end
 
       def void(identification, options = {})
@@ -226,6 +231,8 @@ module ActiveMerchant #:nodoc:
           "#{test? ? self.test_url : self.live_url}/Recurring/#{API_VERSION}/storeToken"
         when 'finalize3ds'
           "#{test? ? self.test_url : self.live_url}/Payment/#{API_VERSION}/authorise3d"
+        when 'storeDetailAndSubmitThirdParty'
+          "#{test? ? self.test_url : self.live_url}/Payout/#{API_VERSION}/#{action}"
         else
           "#{test? ? self.test_url : self.live_url}/Payment/#{API_VERSION}/#{action}"
         end
@@ -263,11 +270,11 @@ module ActiveMerchant #:nodoc:
         hash = {}
         hash[:houseNumberOrName] = house
         hash[:street]            = street
-        hash[:city]              = address[:city] if address[:city]
-        hash[:stateOrProvince]   = address[:state] if address[:state]
-        hash[:postalCode]        = address[:zip] if address[:zip]
-        hash[:country]           = address[:country] if address[:country]
-        hash
+        hash[:city]              = address[:city]
+        hash[:stateOrProvince]   = address[:state]
+        hash[:postalCode]        = address[:zip]
+        hash[:country]           = address[:country]
+        hash.keep_if { |_, v| v }
       end
 
       def amount_hash(money, currency)
@@ -301,20 +308,20 @@ module ActiveMerchant #:nodoc:
 
       def payment_request(money, options)
         hash = {}
-        hash[:merchantAccount]  = @options[:merchant]
-        hash[:reference]        = options[:order_id] if options[:order_id]
-        hash[:shopperEmail]     = options[:email] if options[:email]
-        hash[:shopperIP]        = options[:ip] if options[:ip]
-        hash[:shopperReference] = options[:customer] if options[:customer]
-        hash[:shopperInteraction] = options[:shopper_interaction] if options[:shopper_interaction]
-        hash[:deviceFingerprint]  = options[:device_fingerprint] if options[:device_fingerprint]
+        hash[:merchantAccount]    = @options[:merchant]
+        hash[:reference]          = options[:order_id]
+        hash[:shopperEmail]       = options[:email]
+        hash[:shopperIP]          = options[:ip]
+        hash[:shopperReference]   = options[:customer]
+        hash[:shopperInteraction] = options[:shopper_interaction]
+        hash[:deviceFingerprint]  = options[:device_fingerprint]
         hash.keep_if { |_, v| v }
       end
 
       def store_request(options)
         hash = {}
         hash[:merchantAccount]  = @options[:merchant]
-        hash[:shopperEmail]     = options[:email] if options[:email]
+        hash[:shopperEmail]     = options[:email]
         hash[:shopperReference] = options[:customer] if options[:customer]
         hash.keep_if { |_, v| v }
       end
