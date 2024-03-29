@@ -240,7 +240,8 @@ module ActiveMerchant #:nodoc:
 
       def validate_card_brand #:nodoc:
         errors.add :brand, "is required" if brand.blank? && number.present?
-        errors.add :brand, "is invalid"  unless brand.blank? || CreditCard.card_companies.keys.include?(brand)
+        # error.add bra
+        errors.add :brand, "is invalid"  unless brand.blank? || CreditCard.card_companies.include?(brand)
       end
 
       alias_method :validate_card_type, :validate_card_brand
