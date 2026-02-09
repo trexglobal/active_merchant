@@ -53,6 +53,11 @@ module ActiveMerchant #:nodoc:
       cattr_accessor :require_verification_value
       self.require_verification_value = true
 
+      # Optional logger for validation debugging. Set to enable validation logs:
+      #   CreditCard.validation_logger = Logger.new(STDOUT)
+      cattr_accessor :validation_logger
+      self.validation_logger = nil
+
       # Returns or sets the credit card number.
       #
       # @return [String]
@@ -199,15 +204,41 @@ module ActiveMerchant #:nodoc:
       #
       # Any validation errors are added to the {#errors} attribute.
       def validate
+        raw = number.to_s.gsub(/[^\d]/, '')
+        masked = raw.empty? ? '' : raw.gsub(/\d(?=\d{4})/, 'X')
+        log_validation(:info, "CreditCard#validate started", number: masked, brand: brand, month: month, year: year, first_name: first_name.present?, last_name: last_name.present?, verification_value: verification_value?.to_s)
+
+        before_validate
+
+        log_validation(:info, "CreditCard#validate after before_validate", number: (number.to_s.gsub(/\d(?=\d{4})/, 'X') if number), brand: brand, month: month, year: year)
+
+        log_validation(:info, "Running validate_essential_attributes")
         validate_essential_attributes
+        log_validation_errors("validate_essential_attributes")
 
         # Bogus card is pretty much for testing purposes. Lets just skip these extra tests if its used
-        return if brand == 'bogus'
+        if brand == 'bogus'
+          log_validation(:info, "Skipping remaining validations (bogus card)")
+          return
+        end
 
+        log_validation(:info, "Running validate_card_brand")
         validate_card_brand
+        log_validation_errors("validate_card_brand")
+
+        log_validation(:info, "Running validate_card_number")
         validate_card_number
+        log_validation_errors("validate_card_number")
+
+        log_validation(:info, "Running validate_verification_value")
         validate_verification_value
+        log_validation_errors("validate_verification_value")
+
+        log_validation(:info, "Running validate_switch_or_solo_attributes")
         validate_switch_or_solo_attributes
+        log_validation_errors("validate_switch_or_solo_attributes")
+
+        log_validation(errors.empty? ? :info : :warn, "CreditCard#validate finished", valid: errors.empty?, errors: errors.full_messages)
       end
 
       def self.requires_verification_value?
@@ -278,6 +309,20 @@ module ActiveMerchant #:nodoc:
         if CreditCard.requires_verification_value?
           errors.add :verification_value, "is required" unless verification_value?
         end
+      end
+
+      def log_validation(level, message, data = {})
+        logger = CreditCard.validation_logger
+        return unless logger
+        payload = data.empty? ? message : "#{message} #{data.inspect}"
+        logger.send(level, "[CreditCard validation] #{payload}")
+      end
+
+      def log_validation_errors(step_name)
+        return unless CreditCard.validation_logger
+        return if errors.empty?
+        err_msgs = errors.respond_to?(:full_messages) ? errors.full_messages : errors.to_a
+        CreditCard.validation_logger.warn("[CreditCard validation] After #{step_name}: errors=#{err_msgs.inspect}")
       end
     end
   end
