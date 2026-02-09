@@ -1,23 +1,23 @@
 require 'set'
 
-module ActiveMerchant #:nodoc:
-  module Billing #:nodoc:
+module ActiveMerchant # :nodoc:
+  module Billing # :nodoc:
     # Convenience methods that can be included into a custom Credit Card object, such as an ActiveRecord based Credit Card object.
     module CreditCardMethods
       CARD_COMPANY_DETECTORS = {
         'visa'               => ->(num) { num =~ /^4\d{12}(\d{3})?(\d{3})?$/ },
-        'master'             => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 6), MASTERCARD_RANGES) },
-        'elo'                => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 6), ELO_RANGES) },
-        'cabal'              => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 8), CABAL_RANGES) },
-        'alelo'              => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 6), ALELO_RANGES) },
+        'master'             => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 6), MASTERCARD_RANGES) },
+        'elo'                => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 6), ELO_RANGES) },
+        'cabal'              => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 8), CABAL_RANGES) },
+        'alelo'              => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 6), ALELO_RANGES) },
         'discover'           => ->(num) { num =~ /^(6011|65\d{2}|64[4-9]\d)\d{12,15}$/ },
         'american_express'   => ->(num) { num =~ /^3[47]\d{13}$/ },
-        'naranja'            => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 6), NARANJA_RANGES) },
+        'naranja'            => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 6), NARANJA_RANGES) },
         'diners_club'        => ->(num) { num =~ /^3(0[0-5]|[68]\d)\d{11,16}$/ },
-        'jcb'                => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 4), JCB_RANGES) },
+        'jcb'                => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 4), JCB_RANGES) },
         'dankort'            => ->(num) { num =~ /^5019\d{12}$/ },
         'maestro'            => lambda { |num|
-          (12..19).cover?(num.size) && (
+          num && (12..19).cover?(num.size) && (
             in_bin_range?(num.slice(0, 6), MAESTRO_RANGES) ||
             MAESTRO_BINS.any? { |bin| num.slice(0, bin.size) == bin }
           )
@@ -25,35 +25,38 @@ module ActiveMerchant #:nodoc:
         'maestro_no_luhn'    => ->(num) { num =~ /^(501080|501081|501082)\d{6,13}$/ },
         'forbrugsforeningen' => ->(num) { num =~ /^600722\d{10}$/ },
         'sodexo'             => lambda { |num|
-          num.size == 16 && (
+          num && num.size == 16 && (
             SODEXO_BINS.any? { |bin| num.slice(0, bin.size) == bin }
           )
         },
         'alia'               => ->(num) { num =~ /^(504997|505878|601030|601073|505874)\d{10}$/ },
         'vr'                 => ->(num) { num =~ /^(627416|637036)\d{10}$/ },
-        'unionpay'           => ->(num) { (16..19).cover?(num.size) && in_bin_range?(num.slice(0, 8), UNIONPAY_RANGES) },
+        'unionpay'           => ->(num) { num && (16..19).cover?(num.size) && in_bin_range?(num.slice(0, 8), UNIONPAY_RANGES) },
         'carnet'             => lambda { |num|
-          num.size == 16 && (
+          num && num.size == 16 && (
             in_bin_range?(num.slice(0, 6), CARNET_RANGES) ||
             CARNET_BINS.any? { |bin| num.slice(0, bin.size) == bin }
           )
         },
-        'cartes_bancaires' => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 6), CARTES_BANCAIRES_RANGES) },
+        'cartes_bancaires' => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 6), CARTES_BANCAIRES_RANGES) },
         'olimpica' => ->(num) { num =~ /^636853\d{10}$/ },
         'creditel' => ->(num) { num =~ /^601933\d{10}$/ },
         'confiable' => ->(num) { num =~ /^560718\d{10}$/ },
         'synchrony' => ->(num) { num =~ /^700600\d{10}$/ },
-        'routex' => ->(num) { num =~ /^(700676|700678)\d{13}$/ },
-        'mada' => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 6), MADA_RANGES) },
+        'routex' => ->(num) { num =~ /^(700674|700676|700678)\d{12,13}$/ },
+        'mada' => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 6), MADA_RANGES) },
         'bp_plus' => ->(num) { num =~ /^(7050\d\s\d{9}\s\d{3}$|705\d\s\d{8}\s\d{5}$)/ },
         'passcard' => ->(num) { num =~ /^628026\d{10}$/ },
         'edenred' => ->(num) { num =~ /^637483\d{10}$/ },
         'anda' => ->(num) { num =~ /^603199\d{10}$/ },
         'tarjeta-d' => ->(num) { num =~ /^601828\d{10}$/ },
-        'hipercard' => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 6), HIPERCARD_RANGES) },
-        'panal' => ->(num) { num.size == 16 && in_bin_range?(num.slice(0, 6), PANAL_RANGES) },
-        'verve' => ->(num) { (16..19).cover?(num.size) && in_bin_range?(num.slice(0, 6), VERVE_RANGES) },
-        'tuya' => ->(num) { num =~ /^588800\d{10}$/ }
+        'hipercard' => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 6), HIPERCARD_RANGES) },
+        'panal' => ->(num) { num && num.size == 16 && in_bin_range?(num.slice(0, 6), PANAL_RANGES) },
+        'verve' => ->(num) { num && (16..19).cover?(num.size) && in_bin_range?(num.slice(0, 6), VERVE_RANGES) },
+        'tuya' => ->(num) { num =~ /^588800\d{10}$/ },
+        'uatp' => ->(num) { num =~ /^(1175|1290)\d{11}$/ },
+        'patagonia_365' => ->(num) { num =~ /^504656\d{10}$/ },
+        'tarjeta_sol' => ->(num) { num =~ /^504639\d{10}$/ }
       }
 
       SODEXO_NO_LUHN = ->(num) { num =~ /^(505864|505865)\d{10}$/ }
@@ -126,7 +129,8 @@ module ActiveMerchant #:nodoc:
             501500 501623
             501879 502113 502120 502121 502301
             503175 503337 503645 503670
-            504310 504338 504363 504533 504587 504620 504639 504656 504738 504781 504910
+            504310 504338 504363 504533 504587 504620 504738 504781 504910
+            505616
             507001 507002 507004 507082 507090
             560014 560565 561033
             572402 572610 572626
@@ -174,7 +178,7 @@ module ActiveMerchant #:nodoc:
         (501104..501105),
         (501107..501108),
         (501104..501105),
-        (501107..501108),
+        (501107..501109),
         (501800..501899),
         (502000..502099),
         (503800..503899),
@@ -250,7 +254,7 @@ module ActiveMerchant #:nodoc:
 
       # https://www.discoverglobalnetwork.com/content/dam/discover/en_us/dgn/pdfs/IPP-VAR-Enabler-Compliance.pdf
       UNIONPAY_RANGES = [
-        62000000..62000000, 62212600..62379699, 62400000..62699999, 62820000..62889999,
+        62000000..62000000, 62178570..62178570, 62212600..62379699, 62400000..62699999, 62820000..62889999,
         81000000..81099999, 81100000..81319999, 81320000..81519999, 81520000..81639999, 81640000..81719999
       ]
 
@@ -375,9 +379,9 @@ module ActiveMerchant #:nodoc:
         # - http://www.beachnet.com/~hstiles/cardtype.html
         def valid_number?(number)
           valid_test_mode_card_number?(number) ||
-            valid_card_number_length?(number) &&
+            (valid_card_number_length?(number) &&
               valid_card_number_characters?(brand?(number), number) &&
-              valid_by_algorithm?(brand?(number), number)
+              valid_by_algorithm?(brand?(number), number))
         end
 
         def card_companies
@@ -396,7 +400,7 @@ module ActiveMerchant #:nodoc:
         end
 
         def electron?(number)
-          return false unless [16, 19].include?(number.length)
+          return false unless number && [16, 19].include?(number.length)
 
           # don't recalculate for each range
           bank_identification_number = first_digits(number).to_i
@@ -412,7 +416,7 @@ module ActiveMerchant #:nodoc:
         end
 
         def first_digits(number)
-          number.slice(0, 6) || ''
+          (number && number.slice(0, 6)) || ''
         end
 
         def last_digits(number)
@@ -437,20 +441,20 @@ module ActiveMerchant #:nodoc:
 
         private
 
-        def valid_card_number_length?(number) #:nodoc:
+        def valid_card_number_length?(number) # :nodoc:
           return false if number.nil?
 
           number.length >= 12
         end
 
-        def valid_card_number_characters?(brand, number) #:nodoc:
+        def valid_card_number_characters?(brand, number) # :nodoc:
           return false if number.nil?
           return number =~ /\A[0-9 ]+\Z/ if brand == 'bp_plus'
 
           !number.match(/\D/)
         end
 
-        def valid_test_mode_card_number?(number) #:nodoc:
+        def valid_test_mode_card_number?(number) # :nodoc:
           ActiveMerchant::Billing::Base.test? &&
             %w[1 2 3 success failure error].include?(number)
         end
@@ -459,10 +463,10 @@ module ActiveMerchant #:nodoc:
           SODEXO_NO_LUHN.call(numbers)
         end
 
-        def valid_by_algorithm?(brand, numbers) #:nodoc:
+        def valid_by_algorithm?(brand, numbers) # :nodoc:
           case brand
           when 'naranja'
-            valid_naranja_algo?(numbers)
+            valid_naranja_algo?(numbers) || valid_luhn?(numbers)
           when 'creditel'
             valid_creditel_algo?(numbers)
           when 'alia', 'confiable', 'maestro_no_luhn', 'anda', 'tarjeta-d', 'hipercard'
@@ -506,7 +510,7 @@ module ActiveMerchant #:nodoc:
         # Checks the validity of a card number by use of the Luhn Algorithm.
         # Please see http://en.wikipedia.org/wiki/Luhn_algorithm for details.
         # This implementation is from the luhn_checksum gem, https://github.com/zendesk/luhn_checksum.
-        def valid_luhn?(numbers) #:nodoc:
+        def valid_luhn?(numbers) # :nodoc:
           sum = 0
 
           odd = true
@@ -545,7 +549,7 @@ module ActiveMerchant #:nodoc:
         end
 
         # Checks the validity of a card number by use of specific algorithms
-        def valid_naranja_algo?(numbers) #:nodoc:
+        def valid_naranja_algo?(numbers) # :nodoc:
           num_array = numbers.to_s.chars.map(&:to_i)
           multipliers = [4, 3, 2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
           num_sum = num_array[0..14].zip(multipliers).map { |a, b| a * b }.reduce(:+)
@@ -554,7 +558,7 @@ module ActiveMerchant #:nodoc:
           final_num == num_array[15]
         end
 
-        def valid_creditel_algo?(numbers) #:nodoc:
+        def valid_creditel_algo?(numbers) # :nodoc:
           num_array = numbers.to_s.chars.map(&:to_i)
           multipliers = [5, 4, 3, 2, 1, 9, 8, 7, 6, 5, 4, 3, 2, 1, 9]
           num_sum = num_array[0..14].zip(multipliers).map { |a, b| a * b }.reduce(:+)
